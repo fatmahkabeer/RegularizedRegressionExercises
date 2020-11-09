@@ -1,0 +1,177 @@
+---
+title: "Exercises"
+author: "Fatmah"
+date: "11/8/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(recipes)   # for feature engineering
+library(tidyverse) # general data munging
+
+# Modeling packages
+library(glmnet)   # for implementing regularized regression
+library(caret)    # for automating the tuning process
+library(rsample)  # for sampling
+
+# Model interpretability packages
+library(vip)      # for variable importance
+```
+#### Using the Hitters dataset from the ISLR package (data(Hitters, package = "ISLR")):
+
+```{r}
+library(ISLR)
+data(Hitters)
+
+Hitters <- na.omit(Hitters)
+
+set.seed(123)
+split <- initial_split(Hitters, strata = "Salary")
+Hitters_train <- training(split)
+
+# Create training feature matrices
+# we use model.matrix(...)[, -1] to discard the intercept
+X <- model.matrix(Salary ~ ., Hitters_train)[, -1]
+
+# transform y with log transformation
+Y <- log(Hitters_train$Salary)
+```
+
+
+**1.Apply a ridge model with glmnet with Salary being the response variable.**
+- What is the minimum MSE?
+- What is the minimum MSE within 1 standard error?
+- What are the lambda values for these MSEs?
+```{r}
+# glment can auto-generate the appropriate lambda values based on the data; the vast majority of the time you will have little need to adjust this default.
+ridge <- glmnet(
+  x = X,
+  y = Y,
+  alpha = 0 #0= ridge
+)
+# plot model coefficients vs. shrinkage parameter lambda
+plot(ridge, xvar = "lambda")
+```
+
+
+- What is the minimum MSE(Mean-Squared Error)? 
+```{r}
+ridge <- cv.glmnet(
+  x = X,
+  y = Y,
+  alpha = 0
+)
+plot(ridge)
+
+#Ridge model - lambda for this min MSE
+min(ridge$cvm)
+```
+
+- What is the minimum MSE within 1 standard error?
+```{r}
+#the largest value of λ such that the error is within 1 standard error of the minimum
+ridge$cvm[ridge$lambda == ridge$lambda.1se]
+
+```
+- What are the lambda values for these MSEs?
+```{r}
+# Ridge model w/1-SE rule -- No. of coef | 1-SE MSE
+ridge$nzero[ridge$lambda == ridge$lambda.1se]
+```
+
+**2.Apply a lasso model with glmnet.**
+- What is the minimum MSE?
+- What is the minimum MSE within 1 standard error?
+- What are the lambda values for these MSEs?
+
+```{r}
+#Apply a lasso model with glmnet.
+lasso <- glmnet(
+  x = X,
+  y = Y,
+  alpha = 1 #1= lasso
+)
+
+plot(lasso, xvar = "lambda") #xvar = testing for all version of lambda
+```
+
+- What is the minimum MSE?
+```{r}
+lasso <- cv.glmnet(
+  x = X,
+  y = Y,
+  alpha = 1
+)
+
+plot(lasso)
+
+#What is the minimum MSE?
+min(lasso$cvm)
+```
+
+- What is the minimum MSE within 1 standard error?
+```{r}
+
+# Lasso model - w/1-SE rule
+lasso$cvm[lasso$lambda == lasso$lambda.1se]
+```
+
+- What are the lambda values for these MSEs?
+```{r}
+# Lasso model w/1-SE rule -- No. of coef | 1-SE MSE
+lasso$nzero[lasso$lambda == lasso$lambda.1se]
+```
+
+**3.Perform a grid search across alpha parameter values ranging between 0–1.**
+####Grid search
+Often, the optimal model contains an alpha somewhere between 0–1, thus we want to tune both the λ and the alpha parameters. 
+```{r}
+#Perform a grid search across alpha parameter values ranging between 0–1.
+hyper_grid <- expand.grid( # The hyper_grid will have all the compination between alpha and lambda values
+  alpha = seq(0, 1, by = .25),
+  lambda = c(0.1, 10, 100, 1000, 10000)
+)
+
+# perform resampling
+set.seed(123)
+cv_glmnet <- train(
+  x = X,
+  y = Y,
+  method = "glmnet", # we use the meta engen
+  preProc = c("zv", "center", "scale"), #zv = remove the zero variance
+  trControl = trainControl(method = "cv", number = 10),
+  tuneLength = 10
+)
+```
+
+#What is the optimal alpha and lambda values?
+```{r}
+# best model
+cv_glmnet$results %>%
+  filter(
+    alpha == cv_glmnet$bestTune$alpha, #optimal alpha
+    lambda == cv_glmnet$bestTune$lambda #optimal lambda
+    )
+```
+
+
+#What is the MSE and RMSE for this optimal model?
+```{r}
+
+```
+
+
+#How does it compare to your previous models?
+```{r}
+# predict salary on training data
+pred <- predict(cv_glmnet, X)
+# compute RMSE of transformed predicted
+RMSE(exp(pred), exp(Y))
+```
+
+**4.Plot the top 10 most influential features. Do these features have positive or negative impacts on your response variable?**
+```{r}
+plot(cv_glmnet)
+```
+
