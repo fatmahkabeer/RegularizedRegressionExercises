@@ -21,3 +21,8 @@ when **Least Squares** determins values for the parameters inthis equation **Siz
 - It is very similar to **Ridge Regression**, but it has some very important differences.
 - The big diffrence between Ridge and Lasso Regression is that Ridge Regression can only shrink the slope asymptotically close to 0 while Lasso Regression can shrink the slope all the way to 0.
 - Lasso Regression can exclude useless variables from equations, so it is a little better than Ridge Regression at reducing the Variance in models that contain a lot of useless variables.
+
+
+
+**All information from:**
+https://www.youtube.com/watch?v=Q81RR3yKn30
